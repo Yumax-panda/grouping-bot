@@ -35,3 +35,24 @@ def get_group_members(members: int) -> list[int]:
         グループの人数のリスト。降順にソートされている
     """
     return sorted(_get_group_members(members), reverse=True)
+
+
+def allocate(members: list[T]) -> list[list[T]]:
+    """メンバーをグループに分ける
+
+    Parameters
+    ----------
+    members : list[T]
+        メンバーのリスト
+
+    Returns
+    -------
+    list[list[T]]
+        グループのリスト
+    """
+    group_members = get_group_members(len(members))
+    groups = []
+    for i in group_members:
+        groups.append(members[:i])
+        members = members[i:]
+    return groups
