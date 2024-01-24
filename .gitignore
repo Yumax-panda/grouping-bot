@@ -3,3 +3,5 @@
 .mypy_cache
 .coverage
 config.json
+*__pycache__*
+htmlcov
