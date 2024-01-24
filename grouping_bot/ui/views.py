@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, TypeGuard
 
 from discord import ButtonStyle, Colour, Embed
@@ -10,7 +11,7 @@ from libs.error import CustomError
 
 if TYPE_CHECKING:
     from bot import GroupingBot
-    from discord import Interaction, Member, Message, User
+    from discord import Interaction, Message, TextChannel
     from discord.ext.commands import Context
     from discord.ui import Button, Item
 
@@ -33,8 +34,12 @@ class BaseView(View):
             return
         await interaction.response.send_message(str(error), ephemeral=True)
 
-    def is_valid_message(self, message: Message | None) -> TypeGuard[Message]:
-        return message is not None and len(message.embeds) > 0
+    @staticmethod
+    @abstractmethod
+    def is_valid_message(
+        message: Message | None,  # noqa
+    ) -> TypeGuard[Message]:
+        ...
 
     @property
     @abstractmethod
@@ -70,7 +75,9 @@ class GameJoinView(BaseView):
             color = Colour.green()
         embed = Embed(title="参加者一覧", color=color)
         for idx, member_id in enumerate(self.member_ids):
-            embed.add_field(name=str(idx + 1), value=f"> <@{member_id}>")
+            embed.add_field(
+                name=str(idx + 1), value=f"> <@{member_id}>", inline=False
+            )
         return embed
 
     @staticmethod
@@ -83,8 +90,44 @@ class GameJoinView(BaseView):
         is_archived = embed.color == Colour.dark_grey()
         return GameJoinView(member_ids=member_ids, is_archived=is_archived)
 
-    def has(self, user: User | Member) -> bool:
-        return user.id in self.member_ids
+    @staticmethod
+    def is_valid_message(message: Message | None) -> TypeGuard[Message]:
+        return (
+            message is not None
+            and len(message.embeds) > 0
+            and message.embeds[0].title == "参加者一覧"
+        )
+
+    @staticmethod
+    async def fetch(
+        channel: TextChannel, ignore_archive: bool = True
+    ) -> GameJoinView:
+        span = timedelta(hours=1)
+        async for message in channel.history(after=datetime.utcnow() - span):
+            if not GameJoinView.is_valid_message(message):
+                continue
+            is_archived = message.embeds[0].color == Colour.dark_grey()
+            if is_archived and ignore_archive:
+                continue
+            return GameJoinView.from_embed(message.embeds[0])
+        raise CustomError("現在参加者は募集されていません")
+
+    def has(self, user_id: int) -> bool:
+        return user_id in self.member_ids
+
+    def add(self, user_id: int, raise_error: bool = False) -> None:
+        if not self.has(user_id):
+            self.member_ids.append(user_id)
+            return
+        if raise_error:
+            raise CustomError("既に参加しています")
+
+    def remove(self, user_id: int, raise_error: bool = False) -> None:
+        if self.has(user_id):
+            self.member_ids.remove(user_id)
+            return
+        if raise_error:
+            raise CustomError("参加していません")
 
     async def start(self, ctx: Context) -> None:
         await ctx.send(embed=self.embed, view=self)
@@ -92,14 +135,12 @@ class GameJoinView(BaseView):
     @button(label="参加する", style=ButtonStyle.primary, custom_id="game_join")
     async def join(self, interaction: Interaction, button: Button) -> None:
         await interaction.response.defer()
-        if not self.is_valid_message(interaction.message):
+        if not GameJoinView.is_valid_message(interaction.message):
             raise CustomError("不正なメッセージです")
         this = self.__class__.from_embed(interaction.message.embeds[0])
         user = interaction.user
 
-        if this.has(user):
-            raise CustomError("既に参加しています")
-        this.member_ids.append(user.id)
+        this.add(user.id, raise_error=True)
 
         await this.resend(
             interaction.message, content=f"{user.display_name}さんが参加しました"
@@ -113,9 +154,7 @@ class GameJoinView(BaseView):
         this = self.__class__.from_embed(interaction.message.embeds[0])
         user = interaction.user
 
-        if not this.has(user):
-            raise CustomError("参加していません")
-        this.member_ids.remove(user.id)
+        this.remove(user.id, raise_error=True)
 
         await this.resend(
             interaction.message, content=f"{user.display_name}さんが参加を取り消しました"
@@ -126,7 +165,7 @@ class GameJoinView(BaseView):
         self, interaction: Interaction, button: Button
     ) -> None:
         await interaction.response.defer()
-        if not self.is_valid_message(interaction.message):
+        if not GameJoinView.is_valid_message(interaction.message):
             raise CustomError("不正なメッセージです")
         this = self.__class__.from_embed(interaction.message.embeds[0])
         lineup = LineupView(member_ids=this.member_ids)
@@ -148,7 +187,16 @@ class LineupView(BaseView):
         embed = Embed(title="グループ分け", color=Colour.yellow())
         for idx, group in enumerate(groups):
             embed.add_field(
-                name=f"{idx + 1}組",
+                name=f"{idx + 1}組. ({len(group)}人)",
                 value="\n".join(f"> <@{member_id}>" for member_id in group),
+                inline=False,
             )
         return embed
+
+    @staticmethod
+    def is_valid_message(message: Message | None) -> TypeGuard[Message]:
+        return (
+            message is not None
+            and len(message.embeds) > 0
+            and message.embeds[0].title == "グループ分け"
+        )

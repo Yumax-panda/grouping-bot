@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 
 import discord
 from discord.ext import commands
+from discord.ext.commands.context import Context
+from discord.ext.commands.errors import CommandError
+from libs.error import CustomError
 from ui.views import GameJoinView, LineupView
 
 try:
@@ -50,6 +55,22 @@ class GroupingBot(commands.Bot):
 
     async def on_ready(self) -> None:
         log.info(f"Logged in as {self.user}")
+
+    async def on_command_error(
+        self, context: Context[GroupingBot], exception: CommandError
+    ) -> None:
+        if isinstance(exception, CustomError):
+            await context.send(str(exception))
+            return
+        if isinstance(exception, commands.CommandNotFound):
+            return
+        if isinstance(
+            exception, (commands.MissingRequiredArgument, commands.BadArgument)
+        ):
+            await context.send_help(context.command)
+            return
+        else:
+            raise exception
 
 
 bot = GroupingBot()

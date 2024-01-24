@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from discord import Member, app_commands
 from discord.ext import commands
+from libs.error import CustomError
 from ui.views import GameJoinView
 
 if TYPE_CHECKING:
@@ -18,8 +20,60 @@ class GameCog(commands.Cog):
     )
     async def start(self, ctx: commands.Context[GroupingBot]) -> None:
         view = GameJoinView(member_ids=[ctx.author.id])
-        await view.start(ctx)
-        await ctx.send(f"{ctx.author.display_name}さんが募集を開始しました")
+        await ctx.send(
+            f"{ctx.author.display_name}さんが募集を開始しました",
+            view=view,
+            embed=view.embed,
+        )
+
+    @commands.command(
+        name="join",
+        description="メンバーに参加します",
+        aliases=["参加", "can", "c", "の", "ノ"],
+    )
+    @commands.guild_only()
+    @app_commands.describe(members="参加するメンバー")
+    async def join(
+        self,
+        ctx: commands.Context[GroupingBot],
+        members: commands.Greedy[Member],
+    ) -> None:
+        view = await GameJoinView.fetch(ctx.channel)
+        added: list[Member] = []
+        for member in members:
+            if not member.bot:
+                added.append(member)
+                view.add(member.id)
+        if not added:
+            raise CustomError("参加者できるメンバーがいません")
+        await view.resend(
+            ctx.message, f"{', '.join(m.display_name for m in added)}さんが参加しました"
+        )
+
+    @commands.command(
+        name="cancel",
+        description="メンバーから取り消します",
+        aliases=["取り消し", "d", "drop"],
+    )
+    @commands.guild_only()
+    @app_commands.describe(members="取り消すメンバー")
+    async def cancel(
+        self,
+        ctx: commands.Context[GroupingBot],
+        members: commands.Greedy[Member],
+    ) -> None:
+        view = await GameJoinView.fetch(ctx.channel)
+        removed: list[Member] = []
+        for member in members:
+            if not member.bot:
+                removed.append(member)
+                view.remove(member.id)
+        if not removed:
+            raise CustomError("取り消せるメンバーがいません")
+        await view.resend(
+            ctx.message,
+            f"{', '.join(m.display_name for m in removed)}さんが参加を取り消しました",
+        )
 
 
 async def setup(bot: GroupingBot) -> None:
