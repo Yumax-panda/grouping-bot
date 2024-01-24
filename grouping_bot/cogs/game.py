@@ -18,7 +18,7 @@ class GameCog(commands.Cog):
     @commands.hybrid_command(  # type: ignore
         name="start",
         description="メンバーを募集します",
-        aliases=["募集", "s", "start", "スタート", "開始", "じゃんたま"],
+        aliases=["募集", "s", "スタート", "開始", "じゃんたま"],
     )
     async def start(self, ctx: commands.Context[GroupingBot]) -> None:
         view = GameJoinView(member_ids=[ctx.author.id])
