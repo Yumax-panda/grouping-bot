@@ -57,7 +57,9 @@ class GroupingBot(commands.Bot):
         log.info(f"Logged in as {self.user}")
 
     async def on_command_error(
-        self, context: Context[GroupingBot], exception: CommandError
+        self,
+        context: Context[GroupingBot],  # type: ignore
+        exception: CommandError,
     ) -> None:
         if isinstance(exception, CustomError):
             await context.send(str(exception))

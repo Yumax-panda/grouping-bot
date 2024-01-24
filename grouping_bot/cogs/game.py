@@ -16,7 +16,9 @@ class GameCog(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(  # type: ignore
-        name="start", description="メンバーを募集します"
+        name="start",
+        description="メンバーを募集します",
+        aliases=["募集", "s", "start", "スタート", "開始", "じゃんたま"],
     )
     async def start(self, ctx: commands.Context[GroupingBot]) -> None:
         view = GameJoinView(member_ids=[ctx.author.id])
@@ -38,6 +40,7 @@ class GameCog(commands.Cog):
         ctx: commands.Context[GroupingBot],
         members: commands.Greedy[Member],
     ) -> None:
+        members = members or [ctx.author]  # type: ignore
         view = await GameJoinView.fetch(ctx.channel)
         added: list[Member] = []
         for member in members:
@@ -47,7 +50,7 @@ class GameCog(commands.Cog):
         if not added:
             raise CustomError("参加者できるメンバーがいません")
         await view.resend(
-            ctx.message, f"{', '.join(m.display_name for m in added)}さんが参加しました"
+            f"{', '.join(m.display_name for m in set(added))}さんが参加しました"
         )
 
     @commands.command(
@@ -62,6 +65,7 @@ class GameCog(commands.Cog):
         ctx: commands.Context[GroupingBot],
         members: commands.Greedy[Member],
     ) -> None:
+        members = members or [ctx.author]  # type: ignore
         view = await GameJoinView.fetch(ctx.channel)
         removed: list[Member] = []
         for member in members:
@@ -71,8 +75,7 @@ class GameCog(commands.Cog):
         if not removed:
             raise CustomError("取り消せるメンバーがいません")
         await view.resend(
-            ctx.message,
-            f"{', '.join(m.display_name for m in removed)}さんが参加を取り消しました",
+            f"{', '.join(m.display_name for m in set(removed))}さんが参加を取り消しました",
         )
 
 

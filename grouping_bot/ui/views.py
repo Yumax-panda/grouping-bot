@@ -17,8 +17,9 @@ if TYPE_CHECKING:
 
 
 class BaseView(View):
-    def __init__(self) -> None:
+    def __init__(self, message: Message | None = None) -> None:
         super().__init__(timeout=None)
+        self.message = message
 
     async def on_timeout(self) -> None:
         self.stop()
@@ -46,21 +47,27 @@ class BaseView(View):
     def embed(self) -> Embed:
         ...
 
-    async def refresh(self, message: Message) -> None:
-        await message.edit(embed=self.embed, view=self)
-
-    async def resend(self, message: Message, content: str) -> None:
-        await message.delete()
-        await message.channel.send(
-            embed=self.embed, view=self, content=content
-        )
+    async def resend(
+        self,
+        content: str | None = None,
+        message: Message | None = None,
+    ) -> None:
+        target = message or self.message
+        if target is None:
+            raise CustomError("情報が取得できませんでした")
+        await target.delete()
+        await target.channel.send(content=content, embed=self.embed, view=self)
 
 
 class GameJoinView(BaseView):
     def __init__(
-        self, *, member_ids: list[int], is_archived: bool = False
+        self,
+        *,
+        member_ids: list[int],
+        is_archived: bool = False,
+        message: Message | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(message=message)
         self.member_ids = member_ids
         self.is_archived = is_archived
 
@@ -109,7 +116,9 @@ class GameJoinView(BaseView):
             is_archived = message.embeds[0].color == Colour.dark_grey()
             if is_archived and ignore_archive:
                 continue
-            return GameJoinView.from_embed(message.embeds[0])
+            self = GameJoinView.from_embed(message.embeds[0])
+            self.message = message
+            return self
         raise CustomError("現在参加者は募集されていません")
 
     def has(self, user_id: int) -> bool:
@@ -143,7 +152,8 @@ class GameJoinView(BaseView):
         this.add(user.id, raise_error=True)
 
         await this.resend(
-            interaction.message, content=f"{user.display_name}さんが参加しました"
+            message=interaction.message,
+            content=f"{user.display_name}さんが参加しました",
         )
 
     @button(label="取り消し", style=ButtonStyle.danger, custom_id="game_cancel")
@@ -157,7 +167,8 @@ class GameJoinView(BaseView):
         this.remove(user.id, raise_error=True)
 
         await this.resend(
-            interaction.message, content=f"{user.display_name}さんが参加を取り消しました"
+            message=interaction.message,
+            content=f"{user.display_name}さんが参加を取り消しました",
         )
 
     @button(label="開始", style=ButtonStyle.green, custom_id="game_start")
@@ -168,8 +179,10 @@ class GameJoinView(BaseView):
         if not GameJoinView.is_valid_message(interaction.message):
             raise CustomError("不正なメッセージです")
         this = self.__class__.from_embed(interaction.message.embeds[0])
+        if len(this.member_ids) == 0:
+            raise CustomError("参加者がいません")
         lineup = LineupView(member_ids=this.member_ids)
-        await lineup.resend(interaction.message, content="ゲームが開始されました")
+        await lineup.resend(message=interaction.message, content="ゲームが開始されました")
 
 
 class LineupView(BaseView):
@@ -182,9 +195,6 @@ class LineupView(BaseView):
         return self.create_lineup_embed()
 
     def create_lineup_embed(self) -> Embed:
-        if len(self.member_ids) == 0:
-            raise CustomError("参加者がいません")
-
         shuffled = shuffle(self.member_ids)
         groups = allocate(shuffled)
         embed = Embed(title="グループ分け", color=Colour.yellow())
