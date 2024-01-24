@@ -1,3 +1,4 @@
+import random
 from typing import TypeVar
 
 T = TypeVar("T")
@@ -56,3 +57,19 @@ def allocate(members: list[T]) -> list[list[T]]:
         groups.append(members[:i])
         members = members[i:]
     return groups
+
+
+def shuffle(members: list[T]) -> list[T]:
+    """メンバーをシャッフルする
+
+    Parameters
+    ----------
+    members : list[T]
+        メンバーのリスト
+
+    Returns
+    -------
+    list[T]
+        シャッフルされたメンバーのリスト
+    """
+    return random.sample(members, len(members))

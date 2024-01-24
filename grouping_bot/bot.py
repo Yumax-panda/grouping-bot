@@ -4,7 +4,7 @@ import logging
 
 import discord
 from discord.ext import commands
-from ui.views import GameJoinView
+from ui.views import GameJoinView, LineupView
 
 try:
     with open("config.json") as f:
@@ -40,7 +40,10 @@ class GroupingBot(commands.Bot):
         log.info("Command tree synced.")
 
         if not self.persistent_views_add:
-            for view_instance in (GameJoinView(member_ids=[]),):
+            for view_instance in (
+                GameJoinView(member_ids=[]),
+                LineupView(member_ids=[]),
+            ):
                 self.add_view(view_instance)
             self.persistent_views_add = True
             logging.info("Added views.")
