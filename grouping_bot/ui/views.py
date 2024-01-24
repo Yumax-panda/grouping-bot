@@ -1,22 +1,42 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from discord import ButtonStyle, Embed
 from discord.ui import View, button
-from error import CustomError
+from libs.error import CustomError
 
 if TYPE_CHECKING:
+    from bot import GroupingBot
     from discord import Interaction, Member, User
     from discord.ext.commands import Context
-    from discord.ui import Button
+    from discord.ui import Button, Item
 
 
-class GameJoinView(View):
+class BaseView(View):
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+
+    async def on_timeout(self) -> None:
+        self.stop()
+
+    async def on_error(
+        self,
+        interaction: Interaction[GroupingBot],
+        error: Exception,
+        item: Item[Any],  # noqa
+    ) -> None:
+        if interaction.response.is_done():
+            await interaction.followup.send(str(error), ephemeral=True)
+            return
+        await interaction.response.send_message(str(error), ephemeral=True)
+
+
+class GameJoinView(BaseView):
     def __init__(
         self, *, member_ids: list[int], owner_id: int | None = None
     ) -> None:
-        super().__init__(timeout=None)
+        super().__init__()
         self.member_ids = member_ids
         self.owner_id: int | None = owner_id
         self.lineup_embed: Embed = self.create_lineup_embed()
