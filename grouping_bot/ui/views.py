@@ -182,6 +182,9 @@ class LineupView(BaseView):
         return self.create_lineup_embed()
 
     def create_lineup_embed(self) -> Embed:
+        if len(self.member_ids) == 0:
+            raise CustomError("参加者がいません")
+
         shuffled = shuffle(self.member_ids)
         groups = allocate(shuffled)
         embed = Embed(title="グループ分け", color=Colour.yellow())
