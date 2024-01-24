@@ -17,7 +17,7 @@ class GameCog(commands.Cog):
         name="start", description="メンバーを募集します"
     )
     async def start(self, ctx: commands.Context[GroupingBot]) -> None:
-        view = GameJoinView(member_ids=[ctx.author.id], owner_id=ctx.author.id)
+        view = GameJoinView(member_ids=[ctx.author.id])
         await view.start(ctx)
         await ctx.send(f"{ctx.author.display_name}さんが募集を開始しました")
 

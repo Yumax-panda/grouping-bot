@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from discord import ButtonStyle, Embed
+from discord import ButtonStyle, Colour, Embed
 from discord.ui import View, button
 from libs.error import CustomError
 
@@ -34,19 +34,21 @@ class BaseView(View):
 
 class GameJoinView(BaseView):
     def __init__(
-        self, *, member_ids: list[int], owner_id: int | None = None
+        self, *, member_ids: list[int], is_archived: bool = False
     ) -> None:
         super().__init__()
         self.member_ids = member_ids
-        self.owner_id: int | None = owner_id
+        self.is_archived = is_archived
         self.lineup_embed: Embed = self.create_lineup_embed()
 
     def create_lineup_embed(self) -> Embed:
-        embed = Embed(title="参加者一覧")
+        if self.is_archived:
+            color = Colour.dark_grey()
+        else:
+            color = Colour.green()
+        embed = Embed(title="参加者一覧", color=color)
         for idx, member_id in enumerate(self.member_ids):
             embed.add_field(name=str(idx + 1), value=f"> <@{member_id}>")
-        if self.owner_id is not None:
-            embed.set_footer(text=f"募集ID: {self.owner_id}")
         return embed
 
     @staticmethod
@@ -56,10 +58,8 @@ class GameJoinView(BaseView):
             if (value := field.value) is None:
                 continue
             member_ids.append(int(value[4:-1]))
-        owner_id = None
-        if embed.footer.text is not None:
-            owner_id = int(embed.footer.text[7:])
-        return GameJoinView(member_ids=member_ids, owner_id=owner_id)
+        is_archived = embed.color == Colour.dark_grey()
+        return GameJoinView(member_ids=member_ids, is_archived=is_archived)
 
     def has(self, user: User | Member) -> bool:
         return user.id in self.member_ids
@@ -81,3 +81,18 @@ class GameJoinView(BaseView):
 
         await interaction.message.edit(embed=this.lineup_embed, view=this)
         await interaction.followup.send(f"{user.display_name}さんが参加しました")
+
+    @button(label="取り消し", style=ButtonStyle.danger, custom_id="game_cancel")
+    async def cancel(self, interaction: Interaction, button: Button) -> None:
+        await interaction.response.defer()
+        if interaction.message is None or len(interaction.message.embeds) == 0:
+            raise CustomError("不正なメッセージです")
+        this = self.__class__.from_embed(interaction.message.embeds[0])
+        user = interaction.user
+
+        if not this.has(user):
+            raise CustomError("参加していません")
+        this.member_ids.remove(user.id)
+
+        await interaction.message.edit(embed=this.lineup_embed, view=this)
+        await interaction.followup.send(f"{user.display_name}さんが参加を取り消しました")
