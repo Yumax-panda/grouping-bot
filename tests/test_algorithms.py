@@ -1,6 +1,6 @@
 import pytest
 
-from grouping_bot.libs.algorithms import get_group_members, allocate
+from grouping_bot.libs.algorithms import allocate, get_group_members
 
 
 @pytest.mark.parametrize(
